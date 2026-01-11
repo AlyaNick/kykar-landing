@@ -58,16 +58,74 @@ const year = new Date().getFullYear()
 const bgVideoSrc = '/arc-raiders-bg.mp4'
 const bgPosterSrc = '/arc-raiders-bg.jpg'
 
+// Анимированная "иконка" (логотип) в шапке:
+// положи файл в /public/arc-raiders-logo.mp4 (или .webm) и, опционально, poster.
+const logoVideoSrc = '/arc-raiders-logo.mp4'
+const logoPosterSrc = '/arc-raiders-logo.jpg'
+const hasLogoVideo = ref(true)
+
 // Фото стримера:
-// - положи файл в /public/streamer.jpg (и оставь путь ниже)
-// - или поменяй на своё
-// - пока фото нет, будет fallback /streamer-placeholder.svg
-const streamerPhotoSrc = '/streamer.jpg'
+// - положи файл в /public под одним из имён ниже (любой формат подойдёт)
+// - пока фото нет/путь битый, будет fallback /streamer-placeholder.svg
+const streamerPhotoCandidates = [
+  '/logo.jpeg',
+  '/logo.jpg',
+  '/logo.png',
+  '/streamer.webp',
+  '/streamer.png',
+  '/streamer.jpg',
+]
+const streamerPhotoIdx = ref(0)
+const streamerPhotoSrc = computed(() => streamerPhotoCandidates[streamerPhotoIdx.value] ?? streamerPhotoCandidates[0])
 const streamerFallbackSrc = '/streamer-placeholder.svg'
 const hasStreamerPhoto = ref(true)
 
+function onStreamerPhotoError() {
+  const next = streamerPhotoIdx.value + 1
+  if (next < streamerPhotoCandidates.length) streamerPhotoIdx.value = next
+  else hasStreamerPhoto.value = false
+}
+
 const isContactsOpen = ref(false)
 const contactHref = computed(() => `https://t.me/${contactTg.replace('@', '')}`)
+
+const pageEl = ref<HTMLElement | null>(null)
+let revealIo: IntersectionObserver | null = null
+
+function setupReveal() {
+  const root = pageEl.value
+  if (!root || typeof IntersectionObserver === 'undefined') return
+
+  const els = Array.from(root.querySelectorAll<HTMLElement>('[data-reveal]'))
+  if (!els.length) return
+
+  // Сначала сразу показываем то, что уже в зоне видимости (чтобы не было "пустого экрана").
+  const vh = window.innerHeight || 0
+  const toObserve: HTMLElement[] = []
+  for (const el of els) {
+    const r = el.getBoundingClientRect()
+    if (r.top < vh * 0.92) el.classList.add('is-revealed')
+    else toObserve.push(el)
+  }
+
+  // Включаем reveal-анимацию только когда JS готов (fallback: без этого классa всё видно).
+  root.classList.add('reveal-enabled')
+
+  if (!toObserve.length) return
+
+  revealIo = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue
+        ;(entry.target as HTMLElement).classList.add('is-revealed')
+        revealIo?.unobserve(entry.target)
+      }
+    },
+    { threshold: 0.18, rootMargin: '0px 0px -10% 0px' },
+  )
+
+  for (const el of toObserve) revealIo.observe(el)
+}
 
 function toggleContacts() {
   isContactsOpen.value = !isContactsOpen.value
@@ -85,12 +143,19 @@ function onGlobalKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') closeContacts()
 }
 
-onMounted(() => window.addEventListener('keydown', onGlobalKeydown))
-onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
+onMounted(() => {
+  window.addEventListener('keydown', onGlobalKeydown)
+  setupReveal()
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onGlobalKeydown)
+  revealIo?.disconnect()
+  revealIo = null
+})
 </script>
 
 <template>
-  <div class="page">
+  <div ref="pageEl" class="page">
     <div class="bg" aria-hidden="true">
       <video
         class="bg__video"
@@ -110,7 +175,21 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
     <header class="header">
       <div class="container header__inner">
         <a class="brand" href="#top" aria-label="Kykar">
-          <span class="brand__mark" aria-hidden="true">K</span>
+          <span class="brand__mark" aria-hidden="true">
+            <video
+              v-if="hasLogoVideo"
+              class="brand__markVideo"
+              :src="logoVideoSrc"
+              :poster="logoPosterSrc"
+              autoplay
+              muted
+              loop
+              playsinline
+              preload="auto"
+              @error="hasLogoVideo = false"
+            ></video>
+            <span v-else class="brand__markFallback">K</span>
+          </span>
           <span class="brand__text">
             <span class="brand__name">Kykar</span>
             <span class="brand__tag">стример • ARC RAIDERS</span>
@@ -120,7 +199,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
         <nav class="nav" aria-label="Навигация">
           <a class="nav__link" href="#about">Обо мне</a>
           <a class="nav__link" href="#content">Контент</a>
-          <a class="nav__link" href="#setup">Сетап</a>
+          <a class="nav__link" href="#setup">Оборудование</a>
           <button class="nav__link nav__link--btn" type="button" @click="openContacts">
             Контакты
           </button>
@@ -131,15 +210,21 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
     <main id="top" class="main">
       <section class="hero">
         <div class="container hero__grid">
-          <div class="hero__left">
+          <div class="hero__left" data-reveal :style="{ '--reveal-delay': '0ms' }">
             <p class="kicker">Доброго времени суток!</p>
-            <h1 class="title">
-              Я Никита, можно просто <span class="title__accent">Кук</span>.
+            <h1 class="title title--oneLine">
+              Я Никита, <span class="title__nowrap">можно просто&nbsp;<span class="title__accent">Кук</span></span>.
             </h1>
             <p class="subtitle">
               Играю в <strong>ARC RAIDERS</strong> (предложения игр приветствуются). Залетай —
               будет лампово и по делу.
             </p>
+
+            <div class="hero__chips" aria-label="Темы">
+              <span class="chip chip--brand">ARC RAIDERS</span>
+              <span class="chip">живое общение</span>
+              <span class="chip">без токсика</span>
+            </div>
 
             <div class="cta">
               <a class="btn btn--primary" :href="twitchHref" target="_blank" rel="noreferrer">
@@ -151,34 +236,28 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
             </div>
           </div>
 
-          <aside class="hero__right">
-            <div class="card card--glow">
-              <div class="card__top">
-                <div class="avatar" aria-hidden="true">
-                  <img
-                    v-if="hasStreamerPhoto"
-                    class="avatar__img"
-                    :src="streamerPhotoSrc"
-                    alt=""
-                    loading="lazy"
-                    @error="hasStreamerPhoto = false"
-                  />
-                  <img
-                    v-else
-                    class="avatar__img"
-                    :src="streamerFallbackSrc"
-                    alt=""
-                    loading="lazy"
-                  />
-                </div>
-                <div>
-                  <div class="card__title">Kykar_</div>
-                  <div class="card__meta">Беларусь • Бобруйск</div>
-                </div>
+          <aside class="hero__right" data-reveal :style="{ '--reveal-delay': '120ms' }">
+            <div class="hero__avatarCard">
+              <div class="avatar avatar--hero" aria-label="Фото стримера">
+                <img
+                  v-if="hasStreamerPhoto"
+                  class="avatar__img"
+                  :src="streamerPhotoSrc"
+                  alt="Фото стримера"
+                  loading="lazy"
+                  @error="onStreamerPhotoError"
+                />
+                <img
+                  v-else
+                  class="avatar__img"
+                  :src="streamerFallbackSrc"
+                  alt="Фото стримера"
+                  loading="lazy"
+                />
               </div>
-              <div class="divider" role="presentation"></div>
-              <div class="muted">
-                Если ищешь спокойный, честный стрим без токсика — залетай. 👊
+              <div class="hero__caption">
+                <div class="hero__name">Kykar_</div>
+                <div class="hero__tag muted">стример • ARC RAIDERS</div>
               </div>
             </div>
           </aside>
@@ -187,21 +266,29 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
 
       <section id="about" class="section">
         <div class="container">
-          <h2 class="h2">Обо мне</h2>
+          <h2 class="h2" data-reveal :style="{ '--reveal-delay': '0ms' }">Обо мне</h2>
           <div class="grid grid--2">
-            <div class="panel">
-              <p>Меня зовут Никита или просто Кук — рад приветствовать на своём канале!</p>
-              <p class="muted">
-                Сам Белорус из Бобруйска. По образованию повар, по факту военнослужащий,
-                хобби — стриминг.
+            <div class="panel" data-reveal :style="{ '--reveal-delay': '60ms' }">
+              <p>
+                Я Никита, можно просто <strong>Кук</strong>. Я из Бобруйска — стримлю, общаюсь и делаю
+                честный движ без лишнего шума.
               </p>
+              <p class="muted">По образованию повар, по жизни — военнослужащий. В онлайне — свой человек.</p>
               <ul class="bullets">
-                <li>По образованию повар, по факту военнослужащий.</li>
-                <li>Хобби — стриминг и комьюнити.</li>
-                <li>Люблю честный движ без токсика.</li>
+                <li>Ламповое общение и катки, без токсика.</li>
+                <li>Комьюнити важнее хайпа — уважаем друг друга.</li>
+                <li>Люблю, когда всё по делу: от катки до разборов.</li>
               </ul>
+              <div class="about-note">
+                <div class="about-note__row">
+                  <span class="muted">Ник:</span>&nbsp;<strong>Kykar_</strong>
+                </div>
+                <div class="about-note__row">
+                  <span class="muted">Город:</span>&nbsp;Беларусь • Бобруйск
+                </div>
+              </div>
             </div>
-            <div class="panel panel--outline">
+            <div class="panel panel--outline" data-reveal :style="{ '--reveal-delay': '120ms' }">
               <div class="stat">
                 <div class="stat__k">Основная игра</div>
                 <div class="stat__v">ARC RAIDERS</div>
@@ -221,17 +308,17 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
 
       <section id="content" class="section section--alt">
         <div class="container">
-          <h2 class="h2">Контент</h2>
+          <h2 class="h2" data-reveal :style="{ '--reveal-delay': '0ms' }">Контент</h2>
           <div class="grid grid--3">
-            <div class="panel">
+            <div class="panel" data-reveal :style="{ '--reveal-delay': '60ms' }">
               <h3 class="h3">Стримы</h3>
               <p class="muted">ARC RAIDERS + живое общение. Залетай на Twitch — там база.</p>
             </div>
-            <div class="panel">
+            <div class="panel" data-reveal :style="{ '--reveal-delay': '120ms' }">
               <h3 class="h3">Комьюнити</h3>
               <p class="muted">Telegram для анонсов, Discord для войса и совместных каток.</p>
             </div>
-            <div class="panel">
+            <div class="panel" data-reveal :style="{ '--reveal-delay': '180ms' }">
               <h3 class="h3">Клипы</h3>
               <p class="muted">TikTok — моменты, фейлы и лучшие фраги, чтобы не теряться.</p>
             </div>
@@ -242,12 +329,20 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
       <section id="setup" class="section">
         <div class="container">
           <div class="section__head">
-            <h2 class="h2">Сетап</h2>
-            <p class="muted">Железо и девайсы, на которых идёт стрим.</p>
+            <h2 class="h2" data-reveal :style="{ '--reveal-delay': '0ms' }">Оборудование</h2>
+            <p class="muted" data-reveal :style="{ '--reveal-delay': '60ms' }">
+              Железо и девайсы, на которых идёт стрим.
+            </p>
           </div>
 
           <div class="grid grid--3">
-            <div v-for="item in rig" :key="item.k" class="panel panel--tight">
+            <div
+              v-for="(item, idx) in rig"
+              :key="item.k"
+              class="panel panel--tight"
+              data-reveal
+              :style="{ '--reveal-delay': `${Math.min(idx, 8) * 50}ms` }"
+            >
               <div class="kv">
                 <div class="kv__k">{{ item.k }}</div>
                 <div class="kv__v">{{ item.v }}</div>
@@ -260,7 +355,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
 
     <footer class="footer">
       <div class="container footer__inner">
-        <div class="muted">© {{ year }} Kykar</div>
+        <div class="muted">© {{ year }} Kykar_ • стримы на Twitch</div>
       </div>
     </footer>
 
