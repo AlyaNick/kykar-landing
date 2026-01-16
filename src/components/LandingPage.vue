@@ -288,7 +288,6 @@ onBeforeUnmount(() => {
             <div class="hero__about">
               <div class="hero__aboutText">
                 <p class="subtitle">Я из Бобруйска — стримлю, общаюсь и делаю честный движ без лишнего шума.</p>
-                <p class="muted">По образованию повар, по жизни — военнослужащий.</p>
               </div>
               <div class="hero__aboutList">
                 <div class="hero__aboutLabel">Коротко о стриме</div>
@@ -330,20 +329,6 @@ onBeforeUnmount(() => {
                       </svg>
                     </span>
                     <span>Комьюнити важнее хайпа — уважаем друг друга.</span>
-                  </li>
-                  <li class="hero__aboutTag">
-                    <span class="hero__aboutIcon" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" fill="none">
-                        <path
-                          d="M7 7h10v10H7z"
-                          stroke="currentColor"
-                          stroke-width="1.6"
-                          stroke-linejoin="round"
-                        />
-                        <path d="M9.5 12h5M12 9.5v5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
-                      </svg>
-                    </span>
-                    <span>Люблю, когда всё по делу: от катки до разборов.</span>
                   </li>
                 </ul>
               </div>
